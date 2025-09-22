@@ -7,3 +7,4 @@ gunicorn
 whitenoise
 psycopg[binary]
 djangorestframework-simplejwt
+djangorestframework-simplejwt
