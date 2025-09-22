@@ -16,22 +16,26 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
-from core.views import ping
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
-from rest_framework.permissions import AllowAny
 from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from django.http import JsonResponse
 
-# Make /ping public (no auth required)
 @api_view(["GET"])
 @permission_classes([AllowAny])
-def public_ping(request):
+def ping(_req):
     return JsonResponse({"ok": True, "service": "tribestock-api"})
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def me(request):
+    roles = list(request.user.groups.values_list("name", flat=True))
+    return JsonResponse({"user": request.user.username, "roles": roles})
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path("ping/", public_ping),  # public
-    # JWT
+    path("ping/", ping),  # public
+    path("me/", me),      # protected
     path("auth/login/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("auth/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
 ]
