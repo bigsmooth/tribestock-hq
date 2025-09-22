@@ -75,12 +75,11 @@ DATABASES = {
     )
 }
 
-# CORS + Static
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    os.getenv("WEB_ORIGIN",""),
-]
+# CORS
+BASE_FRONTENDS = ["http://localhost:3000", "http://127.0.0.1:3000"]
+WEB_ORIGIN = os.getenv("WEB_ORIGIN")
+CORS_ALLOWED_ORIGINS = BASE_FRONTENDS + ([WEB_ORIGIN] if WEB_ORIGIN else [])
+
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
