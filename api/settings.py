@@ -2,38 +2,40 @@
 Django settings for api project.
 """
 
-import os, dj_database_url
+import os
 from pathlib import Path
 from dotenv import load_dotenv
+import dj_database_url
+
 load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Security
+# --- Security ---
 SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret")
 DEBUG = os.getenv("DEBUG", "True") == "True"
 
 ALLOWED_HOSTS = [
     "localhost", "127.0.0.1",
     "tribestock-hq.onrender.com",
-    ".onrender.com"
+    ".onrender.com",
 ]
 
 CSRF_TRUSTED_ORIGINS = [
     "https://tribestock-hq.onrender.com",
-    "https://*.onrender.com"
+    "https://*.onrender.com",
 ]
 
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
-# Applications
+# --- Applications ---
 INSTALLED_APPS = [
     "django.contrib.admin","django.contrib.auth","django.contrib.contenttypes",
     "django.contrib.sessions","django.contrib.messages","django.contrib.staticfiles",
     "rest_framework","corsheaders","core",
 ]
 
-# Middleware
+# --- Middleware ---
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
@@ -66,7 +68,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "api.wsgi.application"
 
-# Database (Neon)
+# --- Database (Neon/Render) ---
 DATABASES = {
     "default": dj_database_url.config(
         default=os.getenv("DATABASE_URL"),
@@ -75,23 +77,29 @@ DATABASES = {
     )
 }
 
-# CORS
+# --- CORS ---
 BASE_FRONTENDS = ["http://localhost:3000", "http://127.0.0.1:3000"]
 WEB_ORIGIN = os.getenv("WEB_ORIGIN")
 CORS_ALLOWED_ORIGINS = BASE_FRONTENDS + ([WEB_ORIGIN] if WEB_ORIGIN else [])
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_HEADERS = ["*"]
 
-
-STATIC_URL = "static/"
+# --- Static / WhiteNoise ---
+STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STORAGES = {
-    "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"}
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"
+    }
 }
 
-# Timezone
+# --- Time / I18N ---
 TIME_ZONE = "America/New_York"
 USE_TZ = True
+LANGUAGE_CODE = "en-us"
+USE_I18N = True
 
-# Password validators
+# --- Auth ---
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
@@ -99,14 +107,9 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
-# I18N
-LANGUAGE_CODE = "en-us"
-USE_I18N = True
-
-# Primary key type
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# DRF + JWT
+# --- DRF + JWT ---
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
@@ -114,14 +117,8 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": (
         "rest_framework.permissions.IsAuthenticated",
     ),
-}
-
-# DRF + JWT
-REST_FRAMEWORK = {
-    "DEFAULT_AUTHENTICATION_CLASSES": (
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
-    ),
-    "DEFAULT_PERMISSION_CLASSES": (
-        "rest_framework.permissions.IsAuthenticated",
-    ),
+    # Versioning
+    "DEFAULT_VERSIONING_CLASS": "rest_framework.versioning.NamespaceVersioning",
+    "DEFAULT_VERSION": "v1",
+    "ALLOWED_VERSIONS": ["v1"],
 }

@@ -1,5 +1,5 @@
+# core/views.py
 from django.db import transaction
-from django.contrib.auth.models import Group
 from django.shortcuts import get_object_or_404
 
 from rest_framework import status
@@ -9,18 +9,31 @@ from rest_framework.response import Response
 
 from .models import Hub, SKU, Inventory, InventoryLog
 from .serializers import (
+    HubSerializer,
     SKUSerializer,
     InventorySerializer,
     InventoryAdjustSerializer,
+    InventoryLogSerializer,
 )
 
-# -----------------------------
-# SKU endpoints
-# -----------------------------
 
 def _is_admin(user) -> bool:
     return user.is_superuser or user.groups.filter(name="Admin").exists()
 
+
+# -----------------------------
+# Hubs
+# -----------------------------
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def hubs(request):
+    qs = Hub.objects.order_by("code", "name")
+    return Response(HubSerializer(qs, many=True).data, status=200)
+
+
+# -----------------------------
+# SKUs
+# -----------------------------
 @api_view(["GET", "POST"])
 @permission_classes([IsAuthenticated])
 def skus(request):
@@ -28,7 +41,6 @@ def skus(request):
         qs = SKU.objects.order_by("sku_code")
         return Response(SKUSerializer(qs, many=True).data)
 
-    # POST (Admins only)
     if not _is_admin(request.user):
         return Response({"detail": "Admin only"}, status=status.HTTP_403_FORBIDDEN)
 
@@ -53,7 +65,6 @@ def sku_detail(request, pk: int):
         ser.save()
         return Response(ser.data)
 
-    # DELETE
     if not _is_admin(request.user):
         return Response({"detail": "Admin only"}, status=403)
     sku.delete()
@@ -63,20 +74,30 @@ def sku_detail(request, pk: int):
 # -----------------------------
 # Inventory
 # -----------------------------
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def inventory_by_hub(request, hub_id: int):
+    rows = (
+        Inventory.objects.filter(hub_id=hub_id)
+        .select_related("sku")
+        .order_by("sku__name")
+    )
+    return Response(InventorySerializer(rows, many=True).data, status=200)
+
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 @transaction.atomic
 def inventory_adjust(request):
     """
-    Body:
-      {
-        "sku_id": 1,
-        "hub_id": 1,
-        "action": "IN" | "OUT",
-        "quantity": 5,
-        "note": "optional"
-      }
+    Body JSON:
+    {
+      "sku_id": 3,
+      "hub_id": 7,
+      "action": "IN" | "OUT",
+      "quantity": 5,
+      "note": "optional"
+    }
     """
     ser = InventoryAdjustSerializer(data=request.data)
     if not ser.is_valid():
@@ -86,9 +107,11 @@ def inventory_adjust(request):
     hub_id = ser.validated_data["hub_id"]
     qty = ser.validated_data["quantity"]
     action = ser.validated_data["action"]
+    note = ser.validated_data.get("note", "")
 
-    # lock row during update
     sku = get_object_or_404(SKU, pk=sku_id)
+    get_object_or_404(Hub, pk=hub_id)  # ensure hub exists
+
     inv, _ = Inventory.objects.select_for_update().get_or_create(
         hub_id=hub_id, sku=sku, defaults={"quantity": 0}
     )
@@ -99,7 +122,6 @@ def inventory_adjust(request):
         direction = InventoryLog.IN
         delta = qty
     else:
-        # OUT
         if before - qty < 0:
             return Response({"detail": "Insufficient stock"}, status=400)
         inv.quantity = before - qty
@@ -108,7 +130,6 @@ def inventory_adjust(request):
 
     inv.save()
 
-    # log
     InventoryLog.objects.create(
         hub_id=hub_id,
         sku=sku,
@@ -116,27 +137,35 @@ def inventory_adjust(request):
         delta=delta,
         before_qty=before,
         after_qty=inv.quantity,
-        note=request.data.get("note", ""),
+        note=note,
         actor=request.user if request.user.is_authenticated else None,
     )
 
     return Response(
-        {
-            "ok": True,
-            "hub_id": hub_id,
-            "sku_id": sku_id,
-            "quantity": inv.quantity,
-        },
+        {"ok": True, "hub_id": hub_id, "sku_id": sku_id, "quantity": inv.quantity},
         status=200,
     )
 
 
+# -----------------------------
+# Logs
+# -----------------------------
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
-def inventory_by_hub(request, hub_id: int):
-    rows = (
-        Inventory.objects.filter(hub_id=hub_id)
-        .select_related("sku")
-        .order_by("sku__name")
-    )
-    return Response(InventorySerializer(rows, many=True).data, status=200)
+def inventory_logs(request):
+    hub_id = request.GET.get("hub_id")
+    sku_id = request.GET.get("sku_id")
+    try:
+        limit = int(request.GET.get("limit", 50))
+    except ValueError:
+        limit = 50
+    limit = min(max(limit, 1), 200)
+
+    qs = InventoryLog.objects.select_related("hub", "sku", "actor").order_by("-created_at")
+    if hub_id:
+        qs = qs.filter(hub_id=hub_id)
+    if sku_id:
+        qs = qs.filter(sku_id=sku_id)
+    qs = qs[:limit]
+
+    return Response(InventoryLogSerializer(qs, many=True).data, status=200)

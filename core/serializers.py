@@ -1,3 +1,4 @@
+# core/serializers.py
 from rest_framework import serializers
 from .models import Hub, SKU, Inventory, InventoryLog
 
@@ -29,9 +30,9 @@ class InventoryAdjustSerializer(serializers.Serializer):
     hub_id = serializers.IntegerField()
     action = serializers.ChoiceField(choices=["IN", "OUT"])
     quantity = serializers.IntegerField(min_value=1)
+    note = serializers.CharField(required=False, allow_blank=True)
 
     def validate(self, data):
-        # Normalize action
         data["action"] = data["action"].upper()
         return data
 
@@ -46,9 +47,15 @@ class InventoryLogSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "created_at",
-            "hub", "hub_code",
-            "sku", "sku_code",
-            "direction", "delta",
-            "before_qty", "after_qty",
-            "note", "actor", "actor_username",
+            "hub",
+            "hub_code",
+            "sku",
+            "sku_code",
+            "direction",
+            "delta",
+            "before_qty",
+            "after_qty",
+            "note",
+            "actor",
+            "actor_username",
         ]
