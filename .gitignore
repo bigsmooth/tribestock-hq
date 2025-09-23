@@ -1,4 +1,22 @@
-.venv/
+# Python
 __pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.sqlite3
+
+# Env & secrets
 .env
-staticfiles/
+.tokens.env
+.last_login.json
+
+# OS
+.DS_Store
+core/.DS_Store
+
+# venv
+.venv/
+
+# IDE
+.vscode/
+.idea/
